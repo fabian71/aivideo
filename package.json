@@ -15,5 +15,8 @@
   "bugs": {
     "url": "https://github.com/fabian71/aivideo/issues"
   },
-  "homepage": "https://github.com/fabian71/aivideo#readme"
+  "homepage": "https://github.com/fabian71/aivideo#readme",
+  "dependencies": {
+    "readline-sync": "^1.4.9"
+  }
 }
