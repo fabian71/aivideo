@@ -61,4 +61,6 @@ typings/
 .next
 
 # credentials
-robots/credentials/*.json
+credentials/*.json
+
+content.json

@@ -1,33 +1,57 @@
 const algorithmia = require('algorithmia')
-const algorithmiaApiKey = require('../robots/credentials/algorithmia.json').apiKey
+const algorithmiaApiKey = require('../credentials/algorithmia.json').apikey
 const sentenceBoundaryDetection = require('sbd')
-
-const watsonApiKey = require('../robots/credentials/watson-nlu.json').apikey
-
+const watsonApiKey = require('../credentials/watson-nlu.json').apikey
+const fetch = require('node-fetch')
 
 const NaturalLanguageUnderstandingV1 = require('watson-developer-cloud/natural-language-understanding/v1.js');
- 
-var nlu = new NaturalLanguageUnderstandingV1({
+
+const nlu = new NaturalLanguageUnderstandingV1({
     iam_apikey: watsonApiKey,
     version: '2018-04-05',
     url: 'https://gateway.watsonplatform.net/natural-language-understanding/api/'
   });
 
+const state = require('./state.js')  
 
-async function robot(content) {
-    await fecthContentFromWikipedia(content)
+async function robot() {
+    const content = state.load()
+
+    if(content.useFecthContentFromWikipediaAlgorithmia){
+      await fecthContentFromWikipediaAlgorithmia(content)
+    }else{
+      await fetchContentFromWikipedia(content)
+    }
+    
     sanitizeContent(content)
     breakContentIntoSentences(content)
     limitMaximumSentences(content)
     await fetchKeywordsOfAllSentences(content)
 
-    async function fecthContentFromWikipedia(content){
+    state.save(content)
+
+    async function fecthContentFromWikipediaAlgorithmia(content){
         const algorithmiaAuthenticated = algorithmia(algorithmiaApiKey)
-        const wikipediaAlgorithm = algorithmiaAuthenticated.algo("web/WikipediaParser/0.1.2?timeout=300")
+        const wikipediaAlgorithm = algorithmiaAuthenticated.algo("web/WikipediaParser/0.1.2")
         const wikipediaResponse = await wikipediaAlgorithm.pipe(content.searchTerm)
         const wikipediaContent = wikipediaResponse.get()
-        
         content.sourceContentOriginal = wikipediaContent.content   
+    }
+
+    async function fetchContentFromWikipedia(content) {
+      try {
+          const response = await fetch(`https://${content.lang}.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&explaintext&titles=${encodeURIComponent(content.searchTerm)}&format=json`)
+          const wikipediaRawResponse = await response.json()
+  
+          const wikipediaRawContent = wikipediaRawResponse.query.pages
+
+          Object.keys(wikipediaRawContent).forEach((key) => {
+              content.sourceContentOriginal = wikipediaRawContent[key]['extract']
+          })
+  
+      } catch (error) {
+          console.log(error)
+      }
     }
 
     function sanitizeContent(content){
@@ -35,9 +59,6 @@ async function robot(content) {
         const withoutDatesInParentheses = removeDatesInParentheses(withoutBlankLinesAndMarkdown)
         
         content.sourceContentSanitized = withoutDatesInParentheses
-
-        //console.log(withoutDatesInParentheses)
-
 
         function removeBlankLinesMarkdown(text){
 
